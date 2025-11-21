@@ -1,0 +1,48 @@
+{
+  "groups": [
+    {
+      "name": "enterprise.governance",
+      "type": "com.enterprise.governance.spring.GovernanceProperties",
+      "sourceType": "com.enterprise.governance.spring.GovernanceProperties"
+    }
+  ],
+  "properties": [
+    {
+      "name": "enterprise.governance.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Enable or disable database governance layer.",
+      "defaultValue": true
+    },
+    {
+      "name": "enterprise.governance.cache-size",
+      "type": "java.lang.Integer",
+      "description": "Maximum size of the governance decision cache.",
+      "defaultValue": 1000
+    },
+    {
+      "name": "enterprise.governance.use-sql-parser",
+      "type": "java.lang.Boolean",
+      "description": "Enable SQL parsing for better rule evaluation.",
+      "defaultValue": true
+    },
+    {
+      "name": "enterprise.governance.block-unsafe-deletes",
+      "type": "java.lang.Boolean",
+      "description": "Block DELETE/UPDATE statements without WHERE clause.",
+      "defaultValue": true
+    },
+    {
+      "name": "enterprise.governance.block-schema-changes",
+      "type": "java.lang.Boolean",
+      "description": "Block schema modification statements (DROP, TRUNCATE, ALTER).",
+      "defaultValue": true
+    },
+    {
+      "name": "enterprise.governance.warn-select-all",
+      "type": "java.lang.Boolean",
+      "description": "Warn when SELECT * is used in queries.",
+      "defaultValue": true
+    }
+  ],
+  "hints": []
+}

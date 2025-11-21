@@ -1,0 +1,63 @@
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+}
+
+group = 'com.enterprise'
+version = '1.0.0-SNAPSHOT'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Core logging
+    implementation 'org.slf4j:slf4j-api:2.0.9'
+    
+    // Spring Boot auto-configuration (optional)
+    compileOnly 'org.springframework.boot:spring-boot-starter:3.2.0'
+    compileOnly 'org.springframework.boot:spring-boot-starter-jdbc:3.2.0'
+    compileOnly 'org.springframework.boot:spring-boot-starter-data-r2dbc:3.2.0'
+    implementation 'org.springframework.boot:spring-boot-autoconfigure:3.2.0'
+    annotationProcessor 'org.springframework.boot:spring-boot-autoconfigure-processor:3.2.0'
+    annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor:3.2.0'
+    
+    // R2DBC SPI for reactive database support
+    implementation 'io.r2dbc:r2dbc-spi:1.0.0.RELEASE'
+    
+    // Reactor Core for reactive programming
+    implementation 'io.projectreactor:reactor-core:3.5.0'
+    
+    // JUnit 5 for testing
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.9.3'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.9.3'
+    
+    // Spring Boot test support
+    testImplementation 'org.springframework.boot:spring-boot-starter-test:3.2.0'
+    
+    // Reactor Test for reactive testing
+    testImplementation 'io.projectreactor:reactor-test:3.5.0'
+    
+    // H2 Database for testing
+    testImplementation 'com.h2database:h2:2.2.220'
+    
+    // R2DBC H2 for testing
+    testImplementation 'io.r2dbc:r2dbc-h2:1.0.0.RELEASE'
+}
+
+test {
+    useJUnitPlatform()
+    testLogging {
+        events "passed", "skipped", "failed"
+        exceptionFormat "full"
+    }
+}
+
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
+}

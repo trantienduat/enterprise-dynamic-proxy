@@ -31,7 +31,7 @@ public class InMemoryRuleCache implements RuleCache {
         this.cache = new LinkedHashMap<String, GovernanceDecision>(maxSize, 0.75f, true) {
             @Override
             protected boolean removeEldestEntry(Map.Entry<String, GovernanceDecision> eldest) {
-                return size() > InMemoryRuleCache.this.maxSize;
+                return InMemoryRuleCache.this.size() > InMemoryRuleCache.this.maxSize;
             }
         };
     }

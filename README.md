@@ -1,17 +1,21 @@
 # Enterprise Dynamic Proxy
 
-A Database Governance & Observability Platform that provides transparent SQL query interception and validation for both synchronous (JDBC) and reactive (R2DBC) database drivers.
+A Database Governance & Observability Platform that provides transparent SQL query interception and validation for **all** Java persistence frameworks through lowest-level driver interception.
 
 ## Overview
 
-This project implements a governance layer that intercepts database operations and applies safety rules before executing queries. It uses:
+This library implements **framework-agnostic governance** by intercepting at the lowest level - DataSource (JDBC) and ConnectionFactory (R2DBC). Whether you use **JPA, Hibernate, JdbcTemplate, MyBatis, JOOQ, or any other framework**, this library governs all database operations transparently.
 
-- **Opinionated by Design**: Enforces database safety standards via configuration only
+### Key Principles
+
+- **Lowest-Level Interception**: Intercepts at DataSource/ConnectionFactory, governing all frameworks automatically
+- **Framework-Agnostic**: Works with JPA, Hibernate, MyBatis, JdbcTemplate, JOOQ, Spring Data, and any JDBC/R2DBC framework
+- **Opinionated by Design**: Enforces database safety standards via configuration only - no custom code required
 - **Adapter Pattern** for JDBC (using Dynamic Proxy)
 - **Decorator Pattern** for R2DBC (using Wrapper classes)
 - **Onion Architecture** to separate business logic from driver technologies
 
-> 💡 **Philosophy**: This library is intentionally opinionated. Consumers only add the dependency and configure via YAML - no custom code required. See [Library Philosophy](docs/philosophy.md) for details.
+> 💡 **Philosophy**: This library is intentionally opinionated. Add the dependency and configure via YAML - governance applies to ALL database operations regardless of framework. See [Library Philosophy](docs/philosophy.md) for details.
 
 ## Architecture
 
@@ -88,6 +92,7 @@ flowchart TD
 📚 **[Complete Documentation](docs/README.md)**
 
 - [Getting Started Guide](docs/getting-started.md) - Installation and basic usage
+- [Framework Integration Guide](docs/framework-integration.md) - **JPA, Hibernate, MyBatis, JdbcTemplate, JOOQ support**
 - [Spring Boot Integration](docs/spring-boot-integration.md) - Zero-configuration setup with Spring Boot
 - [Configuration Reference](docs/configuration-reference.md) - All configuration options
 - [Architecture Overview](docs/architecture.md) - Design patterns and architecture
@@ -96,11 +101,25 @@ flowchart TD
 
 ## Features
 
+### Framework-Agnostic Governance
+Intercepts at the **lowest level** (DataSource/ConnectionFactory) to govern **all** frameworks:
+- ✅ **JPA / Hibernate** - All entity operations, JPQL, and native queries
+- ✅ **MyBatis** - All mapper operations and XML queries
+- ✅ **JdbcTemplate** - All Spring JDBC operations
+- ✅ **JOOQ** - All type-safe queries
+- ✅ **Spring Data JDBC** - All repository operations
+- ✅ **Spring Data R2DBC** - All reactive repository operations
+- ✅ **Plain JDBC** - Direct Connection/Statement usage
+- ✅ **Any other JDBC/R2DBC framework**
+
+See [Framework Integration Guide](docs/framework-integration.md) for detailed examples.
+
 ### Spring Boot Auto-Configuration
 Zero-configuration integration with Spring Boot 3.2+:
 - Automatically wraps your `DataSource` (JDBC) or `ConnectionFactory` (R2DBC)
 - Configurable via `application.yml` properties
 - Enable/disable with `enterprise.governance.enabled=true/false`
+- Works transparently with all frameworks in your application
 
 ### SQL Parser
 The `BasicSQLParser` analyzes SQL queries to extract:

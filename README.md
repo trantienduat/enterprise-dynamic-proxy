@@ -6,9 +6,12 @@ A Database Governance & Observability Platform that provides transparent SQL que
 
 This project implements a governance layer that intercepts database operations and applies safety rules before executing queries. It uses:
 
+- **Opinionated by Design**: Enforces database safety standards via configuration only
 - **Adapter Pattern** for JDBC (using Dynamic Proxy)
 - **Decorator Pattern** for R2DBC (using Wrapper classes)
 - **Onion Architecture** to separate business logic from driver technologies
+
+> 💡 **Philosophy**: This library is intentionally opinionated. Consumers only add the dependency and configure via YAML - no custom code required. See [Library Philosophy](docs/philosophy.md) for details.
 
 ## Architecture
 
@@ -80,7 +83,24 @@ flowchart TD
 - Maintains Fluent API contract
 - Fully non-blocking and reactive
 
+## Documentation
+
+📚 **[Complete Documentation](docs/README.md)**
+
+- [Getting Started Guide](docs/getting-started.md) - Installation and basic usage
+- [Spring Boot Integration](docs/spring-boot-integration.md) - Zero-configuration setup with Spring Boot
+- [Configuration Reference](docs/configuration-reference.md) - All configuration options
+- [Architecture Overview](docs/architecture.md) - Design patterns and architecture
+- [Advanced Usage](docs/advanced-usage.md) - Custom rules and advanced topics
+- [API Reference](docs/api-reference.md) - Complete API documentation
+
 ## Features
+
+### Spring Boot Auto-Configuration
+Zero-configuration integration with Spring Boot 3.2+:
+- Automatically wraps your `DataSource` (JDBC) or `ConnectionFactory` (R2DBC)
+- Configurable via `application.yml` properties
+- Enable/disable with `enterprise.governance.enabled=true/false`
 
 ### SQL Parser
 The `BasicSQLParser` analyzes SQL queries to extract:
@@ -104,9 +124,33 @@ The default `SimpleRuleEngine` implements the following safety rules:
 2. **Block schema modifications**: Prevents `DROP TABLE`, `TRUNCATE`, `ALTER TABLE`
 3. **Warn on SELECT ***: Alerts on potentially inefficient queries
 
-## Usage
+## Quick Start
 
-### JDBC Example
+### Spring Boot (Recommended)
+
+Add the dependency:
+```gradle
+dependencies {
+    implementation 'com.enterprise:enterprise-dynamic-proxy:1.0.0-SNAPSHOT'
+}
+```
+
+Configure in `application.yml`:
+```yaml
+enterprise:
+  governance:
+    enabled: true
+    block-unsafe-deletes: true
+    block-schema-changes: true
+```
+
+That's it! Your DataSource/ConnectionFactory is automatically governed.
+
+See [Spring Boot Integration Guide](docs/spring-boot-integration.md) for more details.
+
+### Programmatic Usage
+
+#### JDBC Example
 
 ```java
 import com.enterprise.governance.core.SimpleRuleEngine;
@@ -154,21 +198,22 @@ Mono.from(governedFactory.create())
     .subscribe();
 ```
 
-## Custom Governance Rules
+## Governance Rules
 
-You can implement your own governance rules by implementing the `GovernanceEngine` interface:
+The library enforces these industry-standard safety rules:
 
-```java
-public class CustomRuleEngine implements GovernanceEngine {
-    @Override
-    public GovernanceDecision inspect(String sql, List<Object> params, Map<String, String> context) {
-        // Your custom logic here
-        if (sql.contains("sensitive_table")) {
-            return GovernanceDecision.block("Access to sensitive data denied");
-        }
-        return GovernanceDecision.allow();
-    }
-}
+1. **Block DELETE/UPDATE without WHERE clause** - Prevents accidental mass deletion
+2. **Block schema modifications** - Prevents `DROP`, `TRUNCATE`, `ALTER` operations  
+3. **Warn on SELECT \*** - Alerts on potentially inefficient queries
+
+All rules are configurable via properties - **no custom code required**:
+
+```yaml
+enterprise:
+  governance:
+    block-unsafe-deletes: true      # Enforce WHERE clause
+    block-schema-changes: true      # Block DDL operations
+    warn-select-all: true           # Warn on SELECT *
 ```
 
 ## Building
@@ -213,13 +258,22 @@ This project is provided as-is for educational and demonstration purposes.
 4. **Reactive-Ready**: Full support for reactive programming with R2DBC
 5. **Extensible**: Easy to add custom rules and logic
 
+## What's Included
+
+✅ **SQL Parser**: Extract table names, SQL types, WHERE clauses  
+✅ **Rule Cache**: LRU cache for performance optimization  
+✅ **JDBC Support**: Dynamic Proxy for synchronous databases  
+✅ **R2DBC Support**: Decorator Pattern for reactive databases  
+✅ **Spring Boot**: Auto-configuration for zero-config setup  
+✅ **Comprehensive Tests**: 46 passing tests (14 parser + 9 cache + 11 engine + 7 JDBC + 5 R2DBC)  
+
 ## Future Enhancements
 
 Potential areas for extension:
-- SQL parsing for more sophisticated rule checking
-- Metrics and observability integration
-- Rule caching and optimization
-- Support for prepared statement analysis
+- Advanced SQL parsing with ANTLR or JSqlParser
+- Metrics and observability integration (Micrometer)
+- Distributed cache support (Redis)
+- Dynamic rule loading from database
 - Integration with external policy engines
 - Query performance monitoring
 - Audit logging capabilities

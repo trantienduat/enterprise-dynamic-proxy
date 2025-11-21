@@ -1,27 +1,19 @@
-Database Governance & Observability Architecture
-
-Enterprise Grade - Dependency Free
-
-1. Mô Hình Kiến Trúc (Unified Architecture)
-
-Hệ thống sử dụng mô hình Adapter Pattern để hợp nhất hai luồng xử lý (Sync & Async) về một Core Engine duy nhất.
-
+Database Governance & Observability Platform
+Technical Design Document (TDD)
+1. Architecture Overview
+The system is designed based on the Adapter Pattern combined with Onion Architecture, ensuring complete separation of business logic (Governance) from Database Driver technologies (JDBC/R2DBC).
+Data Flow Diagram
 flowchart TD
     %% Application Layer
     UserRequest[User Request]
 
-    %% Adapter Layer
+    %% Adapter Layer (Intercept)
     subgraph AdapterLayer [Adapter Layer - Intercept]
-        JDBC_Proxy[JDBC Dynamic Proxy]
-        R2DBC_Wrapper[R2DBC Wrapper]
+        JDBC_Proxy[JDBC Dynamic Proxy\n(Sync/Blocking)]
+        R2DBC_Wrapper[R2DBC Wrapper\n(Async/Non-Blocking)]
     end
 
-    subgraph DriverLayer [Driver Layer]
-        JDBC_Driver[JDBC Driver]
-        R2DBC_Driver[R2DBC Driver]
-    end
-
-    %% Core Layer
+    %% Core Layer (Pure Logic)
     subgraph CoreLayer [Core Layer - Pure Logic]
         Engine[Unified Governance Engine]
         Parser[SQL Parser]
@@ -29,77 +21,300 @@ flowchart TD
     end
 
     %% Infrastructure
+    subgraph DriverLayer [Driver Layer]
+        JDBC_Driver[JDBC Driver]
+        R2DBC_Driver[R2DBC Driver]
+    end
     DB[(Physical Database)]
 
-    %% Flow Connections
+    %% Connections
     UserRequest --> JDBC_Proxy
     UserRequest --> R2DBC_Wrapper
 
-    %% JDBC Flow
+    %% JDBC Path
     JDBC_Proxy -- "1. Extract SQL" --> Engine
     Engine -- "2. Return Decision" --> JDBC_Proxy
     JDBC_Proxy -- "3. If ALLOW" --> JDBC_Driver
     JDBC_Driver --> DB
 
-    %% R2DBC Flow
+    %% R2DBC Path
     R2DBC_Wrapper -- "1. Extract SQL" --> Engine
     Engine -- "2. Return Decision" --> R2DBC_Wrapper
     R2DBC_Wrapper -- "3. If ALLOW" --> R2DBC_Driver
     R2DBC_Driver --> DB
 
-    %% Internal Core Connections
+    %% Core Internal
     Engine <--> Parser
     Engine <--> RuleCache
 
 
-2. Chiến lược Implement
+2. Core Engine (The Kernel)
+This is the central "brain" of the system, containing rule validation logic, completely independent of JDBC or R2DBC specificities.
+package com.enterprise.governance.core;
 
-A. JDBC Adapter (Synchronous)
+import java.util.List;
+import java.util.Map;
 
-Kỹ thuật: java.lang.reflect.Proxy (Dynamic Proxy).
+/**
+ * CORE ENGINE: Central processing unit for Governance logic.
+ * Input: Raw SQL + Params.
+ * Output: Decision (Allow/Block).
+ */
+public interface GovernanceEngine {
+    GovernanceDecision inspect(String sql, List<Object> params, Map<String, String> context);
+}
 
-Cơ chế:
+// Value Object for the result
+class GovernanceDecision {
+    enum Action { ALLOW, BLOCK, WARN }
+    
+    private final Action action;
+    private final String reason;
 
-Proxy DataSource -> Trả về Proxied Connection.
+    public GovernanceDecision(Action action, String reason) {
+        this.action = action;
+        this.reason = reason;
+    }
 
-Proxy Connection -> Trả về Proxied Statement.
+    public boolean isBlock() { return action == Action.BLOCK; }
+    public String getReason() { return reason; }
+    
+    public static GovernanceDecision allow() { return new GovernanceDecision(Action.ALLOW, null); }
+    public static GovernanceDecision block(String reason) { return new GovernanceDecision(Action.BLOCK, reason); }
+}
 
-Proxy Statement -> Chặn hàm execute, executeQuery, executeUpdate.
+// Sample Implementation
+class SimpleRuleEngine implements GovernanceEngine {
+    @Override
+    public GovernanceDecision inspect(String sql, List<Object> params, Map<String, String> context) {
+        if (sql == null) return GovernanceDecision.allow();
+        String upperSql = sql.toUpperCase().trim();
+        
+        // Rule 1: Block DELETE/UPDATE without WHERE clause (Naive check)
+        if ((upperSql.startsWith("DELETE") || upperSql.startsWith("UPDATE")) 
+                && !upperSql.contains("WHERE")) {
+            return GovernanceDecision.block("Dangerous Query: Missing WHERE clause.");
+        }
 
-Ưu điểm: Viết code ngắn, cover được mọi hàm tự động.
+        // Rule 2: Block Schema modifications (DDL)
+        if (upperSql.contains("DROP TABLE") || upperSql.contains("TRUNCATE")) {
+             return GovernanceDecision.block("Schema modification is not allowed.");
+        }
 
-B. R2DBC Adapter (Reactive)
+        return GovernanceDecision.allow();
+    }
+}
 
-Kỹ thuật: Manual Wrapper (Decorator Pattern - Viết class implement interface).
 
-Lý do: R2DBC dùng Fluent API (bind().add().execute()). Dynamic Proxy rất dễ gây lỗi leak reference (trả về object thật thay vì proxy).
+3. JDBC Adapter (Synchronous)
+Utilizes Dynamic Proxy (java.lang.reflect.Proxy) to automatically intercept JDBC Driver method calls.
+package com.enterprise.governance.jdbc;
 
-Cơ chế:
+import com.enterprise.governance.core.GovernanceEngine;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.*;
+import javax.sql.DataSource;
 
-GovConnectionFactory wrap ConnectionFactory.
+public class JdbcGovernance {
 
-GovConnection wrap Connection.
+    // Helper to create Proxy
+    @SuppressWarnings("unchecked")
+    public static <T> T createProxy(Object target, Class<T> interfaceType, GovernanceEngine engine) {
+        return (T) Proxy.newProxyInstance(
+                interfaceType.getClassLoader(),
+                new Class<?>[]{interfaceType},
+                new JdbcInvocationHandler(target, engine)
+        );
+    }
 
-GovStatement wrap Statement (Quan trọng nhất).
+    // Main Invocation Handler to intercept methods
+    static class JdbcInvocationHandler implements InvocationHandler {
+        private final Object target;
+        private final GovernanceEngine engine;
+        private final Map<Integer, Object> capturedParams = new HashMap<>();
 
-Xử lý Async: Sử dụng Mono.deferContextual để lấy metadata và check rule trước khi subscribe.
+        public JdbcInvocationHandler(Object target, GovernanceEngine engine) {
+            this.target = target;
+            this.engine = engine;
+        }
 
-3. Luồng dữ liệu (Flow)
+        @Override
+        public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+            String methodName = method.getName();
 
-App gọi query: App không hề biết sự tồn tại của layer này.
+            // 1. Checkpoint: Wrap Connection when retrieved from DataSource
+            if (methodName.equals("getConnection") && target instanceof DataSource) {
+                Connection conn = (Connection) method.invoke(target, args);
+                return createProxy(conn, Connection.class, engine);
+            }
 
-Adapter chặn lại: Lấy SQL raw và tham số (Params).
+            // 2. Checkpoint: Wrap Statement when created from Connection
+            if ((methodName.startsWith("createStatement") || methodName.startsWith("prepare")) 
+                    && target instanceof Connection) {
+                Statement stmt = (Statement) method.invoke(target, args);
+                return createProxy(stmt, Statement.class, engine);
+            }
+            
+            // 3. Capture Parameters (e.g., stmt.setString(1, "abc"))
+            if (methodName.startsWith("set") && args != null && args.length >= 2 && args[0] instanceof Integer) {
+                capturedParams.put((Integer) args[0], args[1]);
+            }
 
-Unified Engine:
+            // 4. Checkpoint: Intercept Execution (EXECUTE)
+            if (methodName.startsWith("execute")) {
+                String sql = null;
+                if (args != null && args.length > 0 && args[0] instanceof String) {
+                    sql = (String) args[0]; // Standard Statement
+                }
+                // Note: For PreparedStatement, SQL should be captured during prepareStatement call
+                
+                if (sql != null) {
+                    // Mock Context retrieval
+                    Map<String, String> context = Map.of("thread", Thread.currentThread().getName());
+                    
+                    // Call Core Engine
+                    var decision = engine.inspect(sql, new ArrayList<>(capturedParams.values()), context);
 
-Parse SQL (Check cú pháp, patterns).
+                    if (decision.isBlock()) {
+                        throw new SQLException("JDBC Governance Blocked: " + decision.getReason());
+                    }
+                }
+            }
 
-Kiểm tra Rules (VD: Không được DELETE thiếu WHERE).
+            // Proceed with original method if allowed
+            return method.invoke(target, args);
+        }
+    }
+}
 
-Trả về GovernanceResult.
 
-Quyết định:
+4. R2DBC Adapter (Reactive)
+Utilizes Manual Wrapper (Decorator Pattern) to control the Fluent API and the asynchronous (Async/Non-blocking) flow of Reactive Streams.
+package com.enterprise.governance.r2dbc;
 
-BLOCK: Adapter ném Exception ngay lập tức.
+import com.enterprise.governance.core.GovernanceEngine;
+import io.r2dbc.spi.*;
+import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import java.util.*;
 
-ALLOW: Adapter gọi driver thật để xuống DB.
+// 1. Wrapper for Statement (Most Critical Component)
+class GovStatement implements Statement {
+    private final Statement delegate;
+    private final String sql;
+    private final GovernanceEngine engine;
+    private final Map<Object, Object> params = new HashMap<>();
+
+    public GovStatement(Statement delegate, String sql, GovernanceEngine engine) {
+        this.delegate = delegate;
+        this.sql = sql;
+        this.engine = engine;
+    }
+
+    // Fluent API: Must return 'this' (wrapper) instead of delegate
+    @Override
+    public Statement bind(int index, Object value) {
+        this.params.put(index, value);
+        this.delegate.bind(index, value);
+        return this; 
+    }
+
+    @Override
+    public Statement bind(String name, Object value) {
+        this.params.put(name, value);
+        this.delegate.bind(name, value);
+        return this;
+    }
+
+    @Override
+    public Statement add() {
+        this.delegate.add();
+        return this;
+    }
+
+    // Execution Logic
+    @Override
+    public Publisher<? extends Result> execute() {
+        // Defer to retrieve Context at Subscription time
+        return Mono.deferContextual(ctxView -> {
+            
+            // 1. Retrieve Context (e.g., User ID from Spring Security Reactor Context)
+            Map<String, String> contextMap = new HashMap<>();
+            
+            // 2. Call Core Engine (Fast in-memory check)
+            var decision = engine.inspect(this.sql, new ArrayList<>(params.values()), contextMap);
+
+            // 3. Block or Allow
+            if (decision.isBlock()) {
+                return Mono.error(new R2dbcException("R2DBC Governance Blocked: " + decision.getReason()));
+            }
+
+            return Flux.from(delegate.execute());
+        });
+    }
+    
+    // Other delegate methods...
+    @Override public Statement bindNull(int index, Class<?> type) { delegate.bindNull(index, type); return this; }
+    @Override public Statement bindNull(String name, Class<?> type) { delegate.bindNull(name, type); return this; }
+    @Override public Statement returnGeneratedValues(String... columns) { delegate.returnGeneratedValues(columns); return this; }
+    @Override public Statement fetchSize(int size) { delegate.fetchSize(size); return this; }
+}
+
+// 2. Wrapper for Connection
+class GovConnection implements Connection {
+    private final Connection delegate;
+    private final GovernanceEngine engine;
+
+    public GovConnection(Connection delegate, GovernanceEngine engine) {
+        this.delegate = delegate;
+        this.engine = engine;
+    }
+
+    @Override
+    public Statement createStatement(String sql) {
+        return new GovStatement(delegate.createStatement(sql), sql, engine);
+    }
+
+    // Delegate transaction methods...
+    @Override public Publisher<Void> close() { return delegate.close(); }
+    @Override public Publisher<Void> beginTransaction() { return delegate.beginTransaction(); }
+    @Override public Publisher<Void> commitTransaction() { return delegate.commitTransaction(); }
+    @Override public Publisher<Void> rollbackTransaction() { return delegate.rollbackTransaction(); }
+    @Override public ConnectionMetadata getMetadata() { return delegate.getMetadata(); }
+    // ... implement all other methods
+    @Override public Publisher<Void> setTransactionIsolationLevel(IsolationLevel l) { return delegate.setTransactionIsolationLevel(l); }
+    @Override public Publisher<Void> setAutoCommit(boolean b) { return delegate.setAutoCommit(b); }
+    @Override public Result validate(ValidationDepth d) { return delegate.validate(d); }
+    @Override public Publisher<Void> createSavepoint(String n) { return delegate.createSavepoint(n); }
+    @Override public Publisher<Void> releaseSavepoint(String n) { return delegate.releaseSavepoint(n); }
+    @Override public Publisher<Void> rollbackTransactionToSavepoint(String n) { return delegate.rollbackTransactionToSavepoint(n); }
+    @Override public boolean isAutoCommit() { return delegate.isAutoCommit(); }
+}
+
+// 3. Wrapper for ConnectionFactory (Entry Point)
+public class GovConnectionFactory implements ConnectionFactory {
+    private final ConnectionFactory delegate;
+    private final GovernanceEngine engine;
+
+    public GovConnectionFactory(ConnectionFactory delegate, GovernanceEngine engine) {
+        this.delegate = delegate;
+        this.engine = engine;
+    }
+
+    @Override
+    public Publisher<? extends Connection> create() {
+        return Mono.from(delegate.create())
+                   .map(conn -> new GovConnection(conn, engine));
+    }
+
+    @Override
+    public ConnectionFactoryMetadata getMetadata() { return delegate.getMetadata(); }
+}
+
+

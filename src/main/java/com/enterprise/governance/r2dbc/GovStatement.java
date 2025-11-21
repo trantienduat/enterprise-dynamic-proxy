@@ -13,6 +13,8 @@ import java.util.*;
 /**
  * Wrapper for R2DBC Statement with governance interception.
  * Implements Fluent API by returning 'this' instead of delegate.
+ * Note: Uses Object as key type for params to support both int and String bindings.
+ * Avoid mixing bind(int, value) and bind(String, value) to prevent key conflicts.
  */
 class GovStatement implements Statement {
     private final Statement delegate;
@@ -63,6 +65,7 @@ class GovStatement implements Statement {
         }
 
         // Log warnings but allow execution
+        // Note: Using System.err for simplicity. Use SLF4J in production.
         if (decision.getAction() == GovernanceDecision.Action.WARN) {
             System.err.println("R2DBC Governance Warning: " + decision.getReason());
         }

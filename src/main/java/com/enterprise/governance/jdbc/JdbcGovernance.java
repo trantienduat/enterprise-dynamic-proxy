@@ -39,6 +39,8 @@ public class JdbcGovernance {
 
     /**
      * Main Invocation Handler to intercept methods.
+     * Note: This implementation is not thread-safe for concurrent use of the same Statement.
+     * For production use, consider using ThreadLocal or concurrent data structures.
      */
     static class JdbcInvocationHandler implements InvocationHandler {
         private final Object target;
@@ -110,6 +112,7 @@ public class JdbcGovernance {
                     }
                     
                     // Log warnings but allow execution
+                    // Note: Using System.err for simplicity. Use SLF4J in production.
                     if (decision.getAction() == GovernanceDecision.Action.WARN) {
                         System.err.println("JDBC Governance Warning: " + decision.getReason());
                     }

@@ -1,0 +1,105 @@
+Database Governance & Observability Architecture
+
+Enterprise Grade - Dependency Free
+
+1. Mô Hình Kiến Trúc (Unified Architecture)
+
+Hệ thống sử dụng mô hình Adapter Pattern để hợp nhất hai luồng xử lý (Sync & Async) về một Core Engine duy nhất.
+
+flowchart TD
+    %% Application Layer
+    UserRequest[User Request]
+
+    %% Adapter Layer
+    subgraph AdapterLayer [Adapter Layer - Intercept]
+        JDBC_Proxy[JDBC Dynamic Proxy]
+        R2DBC_Wrapper[R2DBC Wrapper]
+    end
+
+    subgraph DriverLayer [Driver Layer]
+        JDBC_Driver[JDBC Driver]
+        R2DBC_Driver[R2DBC Driver]
+    end
+
+    %% Core Layer
+    subgraph CoreLayer [Core Layer - Pure Logic]
+        Engine[Unified Governance Engine]
+        Parser[SQL Parser]
+        RuleCache[(Rule Cache)]
+    end
+
+    %% Infrastructure
+    DB[(Physical Database)]
+
+    %% Flow Connections
+    UserRequest --> JDBC_Proxy
+    UserRequest --> R2DBC_Wrapper
+
+    %% JDBC Flow
+    JDBC_Proxy -- "1. Extract SQL" --> Engine
+    Engine -- "2. Return Decision" --> JDBC_Proxy
+    JDBC_Proxy -- "3. If ALLOW" --> JDBC_Driver
+    JDBC_Driver --> DB
+
+    %% R2DBC Flow
+    R2DBC_Wrapper -- "1. Extract SQL" --> Engine
+    Engine -- "2. Return Decision" --> R2DBC_Wrapper
+    R2DBC_Wrapper -- "3. If ALLOW" --> R2DBC_Driver
+    R2DBC_Driver --> DB
+
+    %% Internal Core Connections
+    Engine <--> Parser
+    Engine <--> RuleCache
+
+
+2. Chiến lược Implement
+
+A. JDBC Adapter (Synchronous)
+
+Kỹ thuật: java.lang.reflect.Proxy (Dynamic Proxy).
+
+Cơ chế:
+
+Proxy DataSource -> Trả về Proxied Connection.
+
+Proxy Connection -> Trả về Proxied Statement.
+
+Proxy Statement -> Chặn hàm execute, executeQuery, executeUpdate.
+
+Ưu điểm: Viết code ngắn, cover được mọi hàm tự động.
+
+B. R2DBC Adapter (Reactive)
+
+Kỹ thuật: Manual Wrapper (Decorator Pattern - Viết class implement interface).
+
+Lý do: R2DBC dùng Fluent API (bind().add().execute()). Dynamic Proxy rất dễ gây lỗi leak reference (trả về object thật thay vì proxy).
+
+Cơ chế:
+
+GovConnectionFactory wrap ConnectionFactory.
+
+GovConnection wrap Connection.
+
+GovStatement wrap Statement (Quan trọng nhất).
+
+Xử lý Async: Sử dụng Mono.deferContextual để lấy metadata và check rule trước khi subscribe.
+
+3. Luồng dữ liệu (Flow)
+
+App gọi query: App không hề biết sự tồn tại của layer này.
+
+Adapter chặn lại: Lấy SQL raw và tham số (Params).
+
+Unified Engine:
+
+Parse SQL (Check cú pháp, patterns).
+
+Kiểm tra Rules (VD: Không được DELETE thiếu WHERE).
+
+Trả về GovernanceResult.
+
+Quyết định:
+
+BLOCK: Adapter ném Exception ngay lập tức.
+
+ALLOW: Adapter gọi driver thật để xuống DB.

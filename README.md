@@ -174,13 +174,18 @@ public class CustomRuleEngine implements GovernanceEngine {
 ## Building
 
 ```bash
-mvn clean package
+./gradlew build
 ```
 
 ## Testing
 
 ```bash
-mvn test
+./gradlew test
+```
+
+Run specific test classes:
+```bash
+./gradlew test --tests "com.enterprise.governance.core.*"
 ```
 
 Test coverage includes:
@@ -191,7 +196,7 @@ Test coverage includes:
 
 ## Dependencies
 
-- Java 11 or higher
+- Java 21 or higher
 - R2DBC SPI 1.0.0.RELEASE
 - Reactor Core 3.5.0
 - JUnit 5 for testing

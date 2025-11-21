@@ -21,10 +21,13 @@ class GovConnectionFactoryTest {
 
     @BeforeEach
     void setUp() {
-        // Create H2 in-memory connection factory
+        // Create H2 in-memory connection factory with proper configuration
         connectionFactory = new H2ConnectionFactory(
                 H2ConnectionConfiguration.builder()
                         .inMemory("testdb")
+                        .username("sa")
+                        .password("")
+                        .property("DB_CLOSE_DELAY", "-1")
                         .build()
         );
         
@@ -39,9 +42,9 @@ class GovConnectionFactoryTest {
         StepVerifier.create(
                 connectionMono.flatMapMany(connection ->
                         // First create table to avoid table-not-found errors masking governance errors
-                        Flux.from(connection.createStatement("CREATE TABLE users (id INT, name VARCHAR(100))").execute())
+                        Flux.from(connection.createStatement("CREATE TABLE test_users1 (id INT, name VARCHAR(100))").execute())
                                 .flatMap(result -> Flux.from(result.getRowsUpdated()))
-                                .thenMany(connection.createStatement("DELETE FROM users").execute())
+                                .thenMany(connection.createStatement("DELETE FROM test_users1").execute())
                                 .flatMap(result -> Flux.from(result.getRowsUpdated()))
                                 .doFinally(signal -> Mono.from(connection.close()).subscribe())
                 )
@@ -60,9 +63,9 @@ class GovConnectionFactoryTest {
         
         StepVerifier.create(
                 connectionMono.flatMapMany(connection ->
-                        Flux.from(connection.createStatement("CREATE TABLE users (id INT, name VARCHAR(100))").execute())
+                        Flux.from(connection.createStatement("CREATE TABLE test_users2 (id INT, name VARCHAR(100))").execute())
                                 .flatMap(result -> Flux.from(result.getRowsUpdated()))
-                                .thenMany(connection.createStatement("UPDATE users SET name = 'test'").execute())
+                                .thenMany(connection.createStatement("UPDATE test_users2 SET name = 'test'").execute())
                                 .flatMap(result -> Flux.from(result.getRowsUpdated()))
                                 .doFinally(signal -> Mono.from(connection.close()).subscribe())
                 )
@@ -81,9 +84,9 @@ class GovConnectionFactoryTest {
         
         StepVerifier.create(
                 connectionMono.flatMapMany(connection ->
-                        Flux.from(connection.createStatement("CREATE TABLE users (id INT)").execute())
+                        Flux.from(connection.createStatement("CREATE TABLE test_users3 (id INT)").execute())
                                 .flatMap(result -> Flux.from(result.getRowsUpdated()))
-                                .thenMany(connection.createStatement("DROP TABLE users").execute())
+                                .thenMany(connection.createStatement("DROP TABLE test_users3").execute())
                                 .flatMap(result -> Flux.from(result.getRowsUpdated()))
                                 .doFinally(signal -> Mono.from(connection.close()).subscribe())
                 )
@@ -103,11 +106,11 @@ class GovConnectionFactoryTest {
         
         StepVerifier.create(
                 connectionMono.flatMapMany(connection ->
-                        Flux.from(connection.createStatement("CREATE TABLE users (id INT PRIMARY KEY, name VARCHAR(100))").execute())
+                        Flux.from(connection.createStatement("CREATE TABLE test_users4 (id INT PRIMARY KEY, name VARCHAR(100))").execute())
                                 .flatMap(result -> Flux.from(result.getRowsUpdated()))
-                                .thenMany(connection.createStatement("INSERT INTO users VALUES (1, 'Alice')").execute())
+                                .thenMany(connection.createStatement("INSERT INTO test_users4 VALUES (1, 'Alice')").execute())
                                 .flatMap(result -> Flux.from(result.getRowsUpdated()))
-                                .thenMany(connection.createStatement("SELECT name FROM users WHERE id = 1").execute())
+                                .thenMany(connection.createStatement("SELECT name FROM test_users4 WHERE id = 1").execute())
                                 .flatMap(result -> Flux.from(result.map((row, metadata) -> 
                                         row.get("name", String.class))))
                                 .doFinally(signal -> Mono.from(connection.close()).subscribe())
@@ -123,11 +126,11 @@ class GovConnectionFactoryTest {
         
         StepVerifier.create(
                 connectionMono.flatMapMany(connection ->
-                        Flux.from(connection.createStatement("CREATE TABLE users (id INT, active BOOLEAN)").execute())
+                        Flux.from(connection.createStatement("CREATE TABLE test_users5 (id INT, active BOOLEAN)").execute())
                                 .flatMap(result -> Flux.from(result.getRowsUpdated()))
-                                .thenMany(connection.createStatement("INSERT INTO users VALUES (1, true)").execute())
+                                .thenMany(connection.createStatement("INSERT INTO test_users5 VALUES (1, true)").execute())
                                 .flatMap(result -> Flux.from(result.getRowsUpdated()))
-                                .thenMany(connection.createStatement("UPDATE users SET active = false WHERE id = 1").execute())
+                                .thenMany(connection.createStatement("UPDATE test_users5 SET active = false WHERE id = 1").execute())
                                 .flatMap(result -> Flux.from(result.getRowsUpdated()))
                                 .doFinally(signal -> Mono.from(connection.close()).subscribe())
                 )

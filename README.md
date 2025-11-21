@@ -14,6 +14,53 @@ This project implements a governance layer that intercepts database operations a
 
 The system consists of three main layers:
 
+```mermaid
+flowchart TD
+    %% Application Layer
+    UserRequest[User Request]
+
+    %% Adapter Layer
+    subgraph AdapterLayer [Adapter Layer - Intercept]
+        JDBC_Proxy[JDBC Dynamic Proxy]
+        R2DBC_Wrapper[R2DBC Wrapper]
+    end
+
+    subgraph DriverLayer [Driver Layer]
+        JDBC_Driver[JDBC Driver]
+        R2DBC_Driver[R2DBC Driver]
+    end
+
+    %% Core Layer
+    subgraph CoreLayer [Core Layer - Pure Logic]
+        Engine[Unified Governance Engine]
+        Parser[SQL Parser]
+        RuleCache[(Rule Cache)]
+    end
+
+    %% Infrastructure
+    DB[(Physical Database)]
+
+    %% Flow Connections
+    UserRequest --> JDBC_Proxy
+    UserRequest --> R2DBC_Wrapper
+
+    %% JDBC Flow
+    JDBC_Proxy -- "1. Extract SQL" --> Engine
+    Engine -- "2. Return Decision" --> JDBC_Proxy
+    JDBC_Proxy -- "3. If ALLOW" --> JDBC_Driver
+    JDBC_Driver --> DB
+
+    %% R2DBC Flow
+    R2DBC_Wrapper -- "1. Extract SQL" --> Engine
+    Engine -- "2. Return Decision" --> R2DBC_Wrapper
+    R2DBC_Wrapper -- "3. If ALLOW" --> R2DBC_Driver
+    R2DBC_Driver --> DB
+
+    %% Internal Core Connections
+    Engine <--> Parser
+    Engine <--> RuleCache
+```
+
 ### 1. Core Layer (Pure Logic)
 - **GovernanceEngine**: Interface for implementing governance rules
 - **SimpleRuleEngine**: Default implementation with basic safety rules

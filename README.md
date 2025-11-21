@@ -65,6 +65,10 @@ flowchart TD
 - **GovernanceEngine**: Interface for implementing governance rules
 - **SimpleRuleEngine**: Default implementation with basic safety rules
 - **GovernanceDecision**: Value object representing allow/block/warn decisions
+- **SQLParser**: Interface for parsing SQL queries into structured information
+- **BasicSQLParser**: Regex-based SQL parser implementation
+- **RuleCache**: Interface for caching governance decisions
+- **InMemoryRuleCache**: LRU cache implementation for performance optimization
 
 ### 2. JDBC Adapter (Synchronous)
 - Uses Java's Dynamic Proxy (`java.lang.reflect.Proxy`)
@@ -78,10 +82,26 @@ flowchart TD
 
 ## Features
 
+### SQL Parser
+The `BasicSQLParser` analyzes SQL queries to extract:
+- SQL statement type (SELECT, INSERT, UPDATE, DELETE, DROP, etc.)
+- Table names
+- Presence of WHERE clauses
+- Use of SELECT *
+
+### Rule Cache
+The `InMemoryRuleCache` provides performance optimization through:
+- LRU (Least Recently Used) eviction strategy
+- Configurable cache size (default: 1000 entries)
+- SQL normalization for better cache hit rates
+- Thread-safe concurrent access
+
+### Safety Rules
+
 The default `SimpleRuleEngine` implements the following safety rules:
 
 1. **Block DELETE/UPDATE without WHERE clause**: Prevents accidental mass deletion or updates
-2. **Block schema modifications**: Prevents `DROP TABLE`, `TRUNCATE`, `DROP DATABASE`
+2. **Block schema modifications**: Prevents `DROP TABLE`, `TRUNCATE`, `ALTER TABLE`
 3. **Warn on SELECT ***: Alerts on potentially inefficient queries
 
 ## Usage

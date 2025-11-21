@@ -111,7 +111,7 @@ class SimpleRuleEngineTest {
 
         assertTrue(decision.isBlock());
         assertEquals(GovernanceDecision.Action.BLOCK, decision.getAction());
-        assertTrue(decision.getReason().contains("dropping"));
+        assertTrue(decision.getReason().contains("modification"));
     }
 
     @Test

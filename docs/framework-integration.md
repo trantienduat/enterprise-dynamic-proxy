@@ -4,6 +4,13 @@
 
 The Enterprise Dynamic Proxy library uses **lowest-level interception** to provide database governance for **all** Java persistence frameworks. By intercepting at the `DataSource` (JDBC) and `ConnectionFactory` (R2DBC) level, the library transparently governs database operations regardless of which framework you use.
 
+## 📖 Detailed Examples
+
+For complete, working examples with full code:
+
+- **[JPA/Hibernate Integration Example](examples/jpa-hibernate-example.md)** - Entity definitions, repositories, services, and tests
+- **[MyBatis Integration Example](examples/mybatis-example.md)** - Mapper interfaces, XML configs, and best practices
+
 ## How It Works
 
 ### JDBC Framework Stack

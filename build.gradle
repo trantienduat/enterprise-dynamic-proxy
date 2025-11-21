@@ -39,6 +39,7 @@ dependencies {
     
     // Spring Boot test support
     testImplementation 'org.springframework.boot:spring-boot-starter-test:3.2.0'
+    testImplementation 'org.springframework.boot:spring-boot-starter-jdbc:3.2.0'
     
     // Reactor Test for reactive testing
     testImplementation 'io.projectreactor:reactor-test:3.5.0'
@@ -60,4 +61,9 @@ test {
 
 tasks.withType(JavaCompile) {
     options.encoding = 'UTF-8'
+}
+
+// Handle duplicate files in JAR
+tasks.withType(Jar) {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }

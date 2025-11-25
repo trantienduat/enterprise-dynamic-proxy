@@ -1,6 +1,8 @@
 package com.enterprise.governance.spring;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Configuration properties for database governance.
@@ -38,6 +40,19 @@ public class GovernanceProperties {
      * Warn on SELECT * queries
      */
     private boolean warnSelectAll = true;
+    
+    /**
+     * Enable fast-path bypass for health check and validation queries.
+     * When enabled, simple queries like "SELECT 1" bypass governance parsing.
+     */
+    private boolean enableFastPath = true;
+    
+    /**
+     * List of SQL patterns to bypass governance (regex patterns).
+     * Default includes common health check queries.
+     * These queries skip the parsing penalty for better performance.
+     */
+    private List<String> bypassPatterns = new ArrayList<>();
 
     // Getters and setters
     public boolean isEnabled() {
@@ -86,5 +101,21 @@ public class GovernanceProperties {
 
     public void setWarnSelectAll(boolean warnSelectAll) {
         this.warnSelectAll = warnSelectAll;
+    }
+    
+    public boolean isEnableFastPath() {
+        return enableFastPath;
+    }
+    
+    public void setEnableFastPath(boolean enableFastPath) {
+        this.enableFastPath = enableFastPath;
+    }
+    
+    public List<String> getBypassPatterns() {
+        return bypassPatterns;
+    }
+    
+    public void setBypassPatterns(List<String> bypassPatterns) {
+        this.bypassPatterns = bypassPatterns;
     }
 }

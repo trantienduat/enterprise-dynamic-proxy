@@ -42,6 +42,17 @@
       "type": "java.lang.Boolean",
       "description": "Warn when SELECT * is used in queries.",
       "defaultValue": true
+    },
+    {
+      "name": "enterprise.governance.enable-fast-path",
+      "type": "java.lang.Boolean",
+      "description": "Enable fast-path bypass for health check and validation queries. When enabled, queries like 'SELECT 1' skip governance parsing for better performance.",
+      "defaultValue": true
+    },
+    {
+      "name": "enterprise.governance.bypass-patterns",
+      "type": "java.util.List<java.lang.String>",
+      "description": "List of additional SQL patterns (regex) to bypass governance. Default patterns include common health check queries."
     }
   ],
   "hints": []

@@ -93,6 +93,7 @@ flowchart TD
 - [Architecture Overview](docs/architecture.md) - Design patterns and architecture
 - [Advanced Usage](docs/advanced-usage.md) - Custom rules and advanced topics
 - [API Reference](docs/api-reference.md) - Complete API documentation
+- [Risk & Limitations Analysis](docs/risk-and-limitations.md) - Enterprise adoption considerations
 
 ## Features
 

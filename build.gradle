@@ -58,6 +58,10 @@ test {
     }
 }
 
+jar {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
 tasks.withType(JavaCompile) {
     options.encoding = 'UTF-8'
 }

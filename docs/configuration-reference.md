@@ -22,6 +22,13 @@ All properties are prefixed with `enterprise.governance`:
 | `block-schema-changes` | boolean | `true` | Block DDL operations (DROP, TRUNCATE, ALTER) |
 | `warn-select-all` | boolean | `true` | Issue warnings for SELECT * queries |
 
+### Performance Configuration
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `enable-fast-path` | boolean | `true` | Enable fast-path bypass for health check queries |
+| `bypass-patterns` | List&lt;String&gt; | `[]` | Additional regex patterns to bypass governance |
+
 ## Configuration Examples
 
 ### Development Environment

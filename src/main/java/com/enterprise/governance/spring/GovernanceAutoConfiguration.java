@@ -1,6 +1,12 @@
 package com.enterprise.governance.spring;
 
-import com.enterprise.governance.core.*;
+import com.enterprise.governance.core.BasicSQLParser;
+import com.enterprise.governance.core.FastPathBypass;
+import com.enterprise.governance.core.GovernanceEngine;
+import com.enterprise.governance.core.InMemoryRuleCache;
+import com.enterprise.governance.core.RuleCache;
+import com.enterprise.governance.core.SQLParser;
+import com.enterprise.governance.core.SimpleRuleEngine;
 import com.enterprise.governance.jdbc.JdbcGovernance;
 import com.enterprise.governance.r2dbc.GovConnectionFactory;
 import io.r2dbc.spi.ConnectionFactory;
@@ -19,6 +25,22 @@ import javax.sql.DataSource;
 /**
  * Spring Boot auto-configuration for database governance.
  * Automatically wraps DataSource (JDBC) and ConnectionFactory (R2DBC) with governance layer.
+ * 
+ * <h2>Spring Actuator Integration</h2>
+ * This auto-configuration is designed to work seamlessly with Spring Actuator:
+ * <ul>
+ *   <li>Health check queries (SELECT 1) are automatically bypassed via fast-path</li>
+ *   <li>Connection pool metrics from HikariCP are not affected</li>
+ *   <li>DataSourceHealthIndicator works correctly with the wrapped DataSource</li>
+ * </ul>
+ * 
+ * <h2>Connection Pool Compatibility</h2>
+ * The governance proxy correctly implements java.sql.Wrapper interface, ensuring:
+ * <ul>
+ *   <li>Proper unwrapping to vendor-specific interfaces</li>
+ *   <li>Compatibility with HikariCP, Tomcat JDBC, and other pools</li>
+ *   <li>Spring transaction synchronization continues to work</li>
+ * </ul>
  */
 @AutoConfiguration
 @EnableConfigurationProperties(GovernanceProperties.class)
@@ -44,16 +66,26 @@ public class GovernanceAutoConfiguration {
         log.info("Creating InMemoryRuleCache with size: {}", properties.getCacheSize());
         return new InMemoryRuleCache(properties.getCacheSize());
     }
+    
+    @Bean
+    @ConditionalOnMissingBean
+    public FastPathBypass fastPathBypass(GovernanceProperties properties) {
+        log.info("Creating FastPathBypass enabled={}, additionalPatterns={}", 
+                properties.isEnableFastPath(), 
+                properties.getBypassPatterns().size());
+        return new FastPathBypass(properties.isEnableFastPath(), properties.getBypassPatterns());
+    }
 
     @Bean
     @ConditionalOnMissingBean
     public GovernanceEngine governanceEngine(
             GovernanceProperties properties,
             SQLParser sqlParser,
-            RuleCache ruleCache) {
-        log.info("Creating SimpleRuleEngine with properties: blockUnsafeDeletes={}, blockSchemaChanges={}, warnSelectAll={}",
-                properties.isBlockUnsafeDeletes(), properties.isBlockSchemaChanges(), properties.isWarnSelectAll());
-        return new SimpleRuleEngine(sqlParser, ruleCache);
+            RuleCache ruleCache,
+            FastPathBypass fastPathBypass) {
+        log.info("Creating SimpleRuleEngine with properties: blockUnsafeDeletes={}, blockSchemaChanges={}, warnSelectAll={}, fastPathEnabled={}",
+                properties.isBlockUnsafeDeletes(), properties.isBlockSchemaChanges(), properties.isWarnSelectAll(), properties.isEnableFastPath());
+        return new SimpleRuleEngine(sqlParser, ruleCache, fastPathBypass);
     }
 
     /**

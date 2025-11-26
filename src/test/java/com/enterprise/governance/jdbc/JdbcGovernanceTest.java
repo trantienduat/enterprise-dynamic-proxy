@@ -11,6 +11,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Wrapper;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -128,5 +129,50 @@ class JdbcGovernanceTest {
         });
         
         assertTrue(exception.getMessage().contains("Governance Blocked"));
+    }
+    
+    @Test
+    void testUnwrapToConnection() throws SQLException {
+        Connection govConnection = JdbcGovernance.createProxy(connection, Connection.class, engine);
+        
+        // Should be able to unwrap to Connection interface
+        Connection unwrapped = govConnection.unwrap(Connection.class);
+        assertNotNull(unwrapped);
+        
+        // Unwrapped connection should work
+        assertFalse(unwrapped.isClosed());
+    }
+    
+    @Test
+    void testIsWrapperFor() throws SQLException {
+        Connection govConnection = JdbcGovernance.createProxy(connection, Connection.class, engine);
+        
+        // Should indicate it wraps Connection
+        assertTrue(govConnection.isWrapperFor(Connection.class));
+        
+        // Should not wrap unrelated interfaces
+        assertFalse(govConnection.isWrapperFor(DataSource.class));
+    }
+    
+    @Test
+    void testUnwrapFailsForUnsupportedInterface() {
+        Connection govConnection = JdbcGovernance.createProxy(connection, Connection.class, engine);
+        
+        // Should throw SQLException when unwrapping to unsupported interface
+        assertThrows(SQLException.class, () -> {
+            govConnection.unwrap(DataSource.class);
+        });
+    }
+    
+    @Test
+    void testHealthCheckQueryBypassesGovernance() throws SQLException {
+        Connection govConnection = JdbcGovernance.createProxy(connection, Connection.class, engine);
+        
+        try (Statement stmt = govConnection.createStatement()) {
+            // SELECT 1 should bypass governance (fast-path)
+            var rs = stmt.executeQuery("SELECT 1");
+            assertTrue(rs.next());
+            assertEquals(1, rs.getInt(1));
+        }
     }
 }

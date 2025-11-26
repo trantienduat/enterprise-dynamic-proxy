@@ -11,6 +11,7 @@ Welcome to the Enterprise Dynamic Proxy documentation. This database governance 
 5. [Architecture](architecture.md) - Design patterns and architecture
 6. [Advanced Usage](advanced-usage.md) - Distributed caching, monitoring, performance
 7. [API Reference](api-reference.md) - Complete API documentation
+8. [Risk & Limitations Analysis](risk-and-limitations.md) - **Enterprise adoption considerations**
 
 ## Quick Links
 

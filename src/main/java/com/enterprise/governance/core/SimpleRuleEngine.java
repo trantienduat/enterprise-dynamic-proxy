@@ -7,33 +7,61 @@ import java.util.Optional;
 /**
  * Simple implementation of GovernanceEngine with basic safety rules.
  * Uses SQLParser for query analysis and RuleCache for performance optimization.
+ * 
+ * <h2>Fast-Path Optimization</h2>
+ * This engine supports a fast-path bypass mechanism for health check and validation
+ * queries. When enabled, queries like "SELECT 1" skip the parsing and rule evaluation
+ * entirely, reducing overhead for connection pool validation and Spring Actuator health checks.
+ * 
+ * <h2>Thread Safety</h2>
+ * This class is thread-safe. The cache implementation handles synchronization,
+ * and the fast-path bypass is immutable after construction.
  */
 public class SimpleRuleEngine implements GovernanceEngine {
     
     private final SQLParser parser;
     private final RuleCache cache;
+    private final FastPathBypass fastPath;
     
     /**
-     * Creates a SimpleRuleEngine with default parser and cache.
+     * Creates a SimpleRuleEngine with default parser, cache, and fast-path enabled.
      */
     public SimpleRuleEngine() {
-        this(new BasicSQLParser(), new InMemoryRuleCache());
+        this(new BasicSQLParser(), new InMemoryRuleCache(), new FastPathBypass());
     }
     
     /**
-     * Creates a SimpleRuleEngine with custom parser and cache.
+     * Creates a SimpleRuleEngine with custom parser and cache, fast-path enabled by default.
      * 
      * @param parser SQL parser to use
      * @param cache Rule cache to use
      */
     public SimpleRuleEngine(SQLParser parser, RuleCache cache) {
+        this(parser, cache, new FastPathBypass());
+    }
+    
+    /**
+     * Creates a SimpleRuleEngine with custom parser, cache, and fast-path configuration.
+     * 
+     * @param parser SQL parser to use
+     * @param cache Rule cache to use
+     * @param fastPath Fast-path bypass configuration
+     */
+    public SimpleRuleEngine(SQLParser parser, RuleCache cache, FastPathBypass fastPath) {
         this.parser = parser;
         this.cache = cache;
+        this.fastPath = fastPath != null ? fastPath : new FastPathBypass(false, List.of());
     }
     
     @Override
     public GovernanceDecision inspect(String sql, List<Object> params, Map<String, String> context) {
         if (sql == null || sql.trim().isEmpty()) {
+            return GovernanceDecision.allow();
+        }
+        
+        // Fast-path: bypass governance for trusted queries (health checks, metadata)
+        // This avoids the parsing penalty for connection pool validation and actuator health checks
+        if (fastPath.shouldBypass(sql)) {
             return GovernanceDecision.allow();
         }
         

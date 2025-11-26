@@ -225,13 +225,5 @@ public class JdbcGovernance {
             
             return false;
         }
-        
-        /**
-         * Returns the underlying target object (for testing purposes).
-         * Note: This is package-private for testing only.
-         */
-        Object getTarget() {
-            return target;
-        }
     }
 }

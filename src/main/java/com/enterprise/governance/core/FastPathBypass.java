@@ -1,5 +1,8 @@
 package com.enterprise.governance.core;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -39,6 +42,8 @@ import java.util.regex.Pattern;
  * </ul>
  */
 public class FastPathBypass {
+    
+    private static final Logger log = LoggerFactory.getLogger(FastPathBypass.class);
     
     /**
      * Default exact-match queries that bypass governance.
@@ -121,7 +126,7 @@ public class FastPathBypass {
                     patterns.add(Pattern.compile(pattern, Pattern.CASE_INSENSITIVE));
                 } catch (Exception e) {
                     // Skip invalid patterns, log warning
-                    System.err.println("FastPathBypass: Invalid bypass pattern ignored: " + pattern);
+                    log.warn("Invalid bypass pattern ignored: {}", pattern);
                 }
             }
         }
